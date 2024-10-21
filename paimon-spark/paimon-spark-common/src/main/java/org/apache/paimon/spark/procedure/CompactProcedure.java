@@ -230,6 +230,7 @@ public class CompactProcedure extends BaseProcedure {
                                 .getOrElse(null);
         if (orderType.equals(TableSorter.OrderType.NONE)) {
             JavaSparkContext javaSparkContext = new JavaSparkContext(spark().sparkContext());
+            // askwang-todo: bucket aware 或 bucket un-ware 都无法对部分 buckets 或者部分 tasks 进行 compact
             switch (bucketMode) {
                 case HASH_FIXED:
                 case HASH_DYNAMIC:
@@ -268,6 +269,8 @@ public class CompactProcedure extends BaseProcedure {
         }
         Set<BinaryRow> partitionToBeCompacted =
                 getHistoryPartition(snapshotReader, partitionIdleTime);
+
+        // // 之前是根据读 data splits 获取 bucket 信息，当 splits 比较多时容易出现 oom
         List<Pair<byte[], Integer>> partitionBuckets =
                 snapshotReader.bucketEntries().stream()
                         .map(entry -> Pair.of(entry.partition(), entry.bucket()))
@@ -325,6 +328,7 @@ public class CompactProcedure extends BaseProcedure {
 
         try (BatchTableCommit commit = writeBuilder.newCommit()) {
             CommitMessageSerializer serializer = new CommitMessageSerializer();
+            // askwang-todo: commit 信息比较大时，collect 容易出现 oom 问题，目前没有办法解决。
             List<byte[]> serializedMessages = commitMessageJavaRDD.collect();
             List<CommitMessage> messages = new ArrayList<>(serializedMessages.size());
             for (byte[] serializedMessage : serializedMessages) {

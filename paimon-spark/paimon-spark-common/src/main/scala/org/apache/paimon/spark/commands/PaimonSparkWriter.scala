@@ -398,6 +398,9 @@ case class PaimonSparkWriter(table: FileStoreTable) {
 
   private def repartitionByPartitionsAndBucket(df: DataFrame): DataFrame = {
     val partitionCols = tableSchema.partitionKeys().asScala.map(col).toSeq
+    // askwang-todo: 给表添加 bucket 列时计算了一次 hash， bucket 范围在 [0, bucket-1], 范围比较小
+    // 在 spark 的 RepartitionByExpression 中又会对 partition + bucket 列进行 hash，
+    // 就会出现数据倾斜，一个 Partition 分区会处理多个 bucket 的写入
     df.repartition(partitionCols ++ Seq(col(BUCKET_COL)): _*)
   }
 
